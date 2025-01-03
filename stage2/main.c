@@ -12,7 +12,6 @@
 #include <ps2sdkapi.h>
 #include <libpad.h>
 
-// ELF loading helper
 #include <loadfile.h>
 
 #define MAX_ELFS 256
@@ -50,7 +49,8 @@ void listELFs(const char* path) {
 void displayMenu() {
     scr_clear();
     scr_printf("\nPS2 ELF Loader\n==============\n");
-    for (int i = 0; i < elfCount; i++) {
+    int i;
+    for (i = 0; i < elfCount; i++) {
         if (i == selectedIndex)
             scr_printf("-> %s\n", elfPaths[i]);
         else
@@ -70,7 +70,7 @@ void executeELF(const char* path) {
     }
 
     scr_printf("Execution passed to the ELF.\n");
-    SleepThread(); // Control does not return here.
+    SleepThread();
 }
 
 int main(int argc, char* argv[]) {
