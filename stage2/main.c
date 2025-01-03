@@ -11,7 +11,7 @@
 #include <fileio.h>
 #include <ps2sdkapi.h>
 #include <libpad.h>
-
+#include <gsKit.h>
 #include <loadfile.h>
 
 #define MAX_ELFS 256
