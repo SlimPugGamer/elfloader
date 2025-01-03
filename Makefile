@@ -2,7 +2,7 @@ TARGET = main
 EE_BIN = $(TARGET).elf
 EE_CFLAGS += -DNEWLIB_PORT_AWARE
 EE_LIBS += -lpatches -lgskit
-EE_OBJS += EE_OBJS := stage2/main.o
+EE_OBJS += stage2/main.o
 all: $(EE_BIN)
 
 clean:
