@@ -14,14 +14,13 @@
 #include <gsKit.h>
 #include <loadfile.h>
 
+
 #define MAX_ELFS 256
 #define MAX_PATH 256
 
 char elfPaths[MAX_ELFS][MAX_PATH];
 int elfCount = 0;
 int selectedIndex = 0;
-
-GSFONTM* font = NULL;  // Pointer to the font structure
 
 void listELFs(const char* path) {
     DIR* dir;
@@ -48,32 +47,25 @@ void listELFs(const char* path) {
     closedir(dir);
 }
 
-void displayMenu(GSGLOBAL* gsGlobal) {
-    gsKit_clear(gsGlobal, 0x000000FF);  // Clear the screen with black color
+void displayMenu(GSGLOBAL* gsGlobal, GSFONTM* font) {
+    gsKit_clear(gsGlobal, 0x000000FF);
 
-    // Print the menu header
     gsKit_fontm_print(gsGlobal, font, 0, 0, 0, 0xFFFFFFFF, "PS2 ELF Loader\n==============");
 
-    // Print the ELF files in the list
-    char menuText[256];  // Buffer to store the formatted string
-    int i;
-    for (i = 0; i < elfCount; i++) {
-        // Format the text and pass the formatted string to gsKit_fontm_print
+    char menuText[256];
+    for (int i = 0; i < elfCount; i++) {
         if (i == selectedIndex) {
-            // Highlight the selected ELF file
-            snprintf(menuText, sizeof(menuText), "-> %s", elfPaths[i]); // Format the string
+            snprintf(menuText, sizeof(menuText), "-> %s", elfPaths[i]);
             gsKit_fontm_print(gsGlobal, font, 0, (i + 1) * 20, 0, 0xFFFF00FF, menuText);
         }
         else {
-            // Print the other ELF files normally
             snprintf(menuText, sizeof(menuText), "   %s", elfPaths[i]);
             gsKit_fontm_print(gsGlobal, font, 0, (i + 1) * 20, 0, 0xFFFFFFFF, menuText);
         }
     }
 
-    gsKit_sync_flip(gsGlobal);  // Sync flip with GSGLOBAL
+    gsKit_sync_flip(gsGlobal);
 }
-
 
 void executeELF(const char* path) {
     printf("\nLoading ELF: %s\n", path);
@@ -91,28 +83,19 @@ void executeELF(const char* path) {
 }
 
 int main(int argc, char* argv[]) {
-    SifInitRpc(0);
-
-    // Initialize the graphics system
-    GSGLOBAL* gsGlobal = gsKit_init_global();  // GSKit initialization function (specific for your GSKit version)
-
+    GSGLOBAL* gsGlobal = gsKit_init_global();
     if (gsGlobal == NULL) {
         printf("Error initializing GSKit!\n");
         return 1;
     }
 
-    // Switch to NTSC mode (or PAL, if needed)
-    gsKit_mode_switch(gsGlobal, GS_MODE_NTSC);  // Switch to NTSC mode
-
-    // Initialize the font from a default location (e.g., mc0:/font.fnt)
-    font = gsKit_init_fontm("mc0:/font.fnt");  // Correct font initialization function
-    if (font == NULL) {
-        printf("Error initializing font!\n");
+    gsKit_mode_switch(gsGlobal, GS_MODE_NTSC);
+    GSFONTM font;
+    int ret = gsKit_fontm_upload(gsGlobal, &font);
+    if (ret != 0) {
+        printf("Error uploading font!\n");
         return 1;
     }
-
-    // Upload the font to the graphics system
-    gsKit_fontm_upload(gsGlobal, font);  // Upload the font to the GS
 
     padInit(0);
 
@@ -133,7 +116,7 @@ int main(int argc, char* argv[]) {
     }
 
     while (1) {
-        displayMenu(gsGlobal);
+        displayMenu(gsGlobal, &font);
 
         struct padButtonStatus buttons;
         padRead(0, 0, &buttons);
