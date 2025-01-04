@@ -56,7 +56,8 @@ void displayMenu(GSGLOBAL* gsGlobal) {
 
     // Print the ELF files in the list
     char menuText[256];  // Buffer to store the formatted string
-    for (int i = 0; i < elfCount; i++) {
+    int i;
+    for (i = 0; i < elfCount; i++) {
         // Format the text and pass the formatted string to gsKit_fontm_print
         if (i == selectedIndex) {
             // Highlight the selected ELF file
