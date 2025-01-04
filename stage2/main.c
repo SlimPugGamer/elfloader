@@ -53,7 +53,9 @@ void displayMenu(GSGLOBAL* gsGlobal, GSFONTM* font) {
     gsKit_fontm_print(gsGlobal, font, 0, 0, 0, 0xFFFFFFFF, "PS2 ELF Loader\n==============");
 
     char menuText[256];
-    for (int i = 0; i < elfCount; i++) {
+    int i;
+
+    for (i = 0; i < elfCount; i++) {
         if (i == selectedIndex) {
             snprintf(menuText, sizeof(menuText), "-> %s", elfPaths[i]);
             gsKit_fontm_print(gsGlobal, font, 0, (i + 1) * 20, 0, 0xFFFF00FF, menuText);
