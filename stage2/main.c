@@ -11,136 +11,140 @@
 #include <fileio.h>
 #include <ps2sdkapi.h>
 #include <libpad.h>
-#include <gsKit.h>
 #include <loadfile.h>
+#include <sbv_patches.h>
 
 
-#define MAX_ELFS 256
+#define MAX_APPS 256
 #define MAX_PATH 256
+#define MAX_NAME_LENGTH 128
 
-char elfPaths[MAX_ELFS][MAX_PATH];
-int elfCount = 0;
+typedef struct {
+    char appName[MAX_NAME_LENGTH];
+    char appPath[MAX_PATH];
+} AppEntry;
+
+AppEntry apps[MAX_APPS];
+int appCount = 0;
 int selectedIndex = 0;
 
-void listELFs(const char* path) {
-    DIR* dir;
-    struct dirent* entry;
+const char* ROM0_OSDSYS_PATH = "rom0:OSDSYS";
 
-    dir = opendir(path);
-    if (dir == NULL) {
-        printf("Failed to open directory: %s\n", path);
+void readAppsList(const char* appsListPath) {
+    struct fio_stat stat;
+    int result = fioStat(appsListPath, &stat);
+    if (result < 0) {
+        scr_printf("APPS.LST file does not exist: %s\n", appsListPath);
+        return;
+    }
+    int file = fioOpen(appsListPath, O_RDONLY);
+    if (file < 0) {
+        scr_printf("Failed to open apps list: %s\n", appsListPath);
         return;
     }
 
-    while ((entry = readdir(dir)) != NULL) {
-        const char* ext = strrchr(entry->d_name, '.');
-        if (ext && strcmp(ext, ".elf") == 0) {
-            snprintf(elfPaths[elfCount], MAX_PATH, "%s%s", path, entry->d_name);
-            elfCount++;
-            if (elfCount >= MAX_ELFS) {
-                printf("Too many ELF files, truncating list.\n");
-                break;
+    char line[MAX_PATH];
+    int lineIndex = 0;
+    while (fioRead(file, &line[lineIndex], 1) > 0) {
+        char c = line[lineIndex];
+        lineIndex++;
+
+        if (c == '\n' || lineIndex >= MAX_PATH - 1) {
+            line[lineIndex] = '\0';
+            if (strstr(line, "APP") == line) {
+                char* equalSign = strchr(line, '=');
+                if (equalSign) {
+                    *equalSign = '\0';
+                    char* appName = line;
+                    char* appPath = equalSign + 1;
+                    if (appCount < MAX_APPS) {
+                        strncpy(apps[appCount].appName, appName, MAX_NAME_LENGTH);
+                        strncpy(apps[appCount].appPath, appPath, MAX_PATH);
+                        appCount++;
+                    }
+                }
             }
+
+            lineIndex = 0;
         }
     }
 
-    closedir(dir);
+    fioClose(file);
 }
 
-void displayMenu(GSGLOBAL* gsGlobal, GSFONTM* font) {
-    gsKit_clear(gsGlobal, 0x000000FF);
-
-    gsKit_fontm_print(gsGlobal, font, 0, 0, 0, 0xFFFFFFFF, "PS2 ELF Loader\n==============");
-
-    char menuText[256];
-    int i;
-
-    for (i = 0; i < elfCount; i++) {
-        if (i == selectedIndex) {
-            snprintf(menuText, sizeof(menuText), "-> %s", elfPaths[i]);
-            gsKit_fontm_print(gsGlobal, font, 0, (i + 1) * 20, 0, 0xFFFF00FF, menuText);
-        }
-        else {
-            snprintf(menuText, sizeof(menuText), "   %s", elfPaths[i]);
-            gsKit_fontm_print(gsGlobal, font, 0, (i + 1) * 20, 0, 0xFFFFFFFF, menuText);
-        }
+void displayMenu() {
+    scr_printf("\x1b[2J");
+    scr_printf("PS2 ELF Loader\n==============\n");
+    scr_printf("-> %s\n", ROM0_OSDSYS_PATH);
+    for (int i = 0; i < appCount; i++) {
+        scr_printf((i == selectedIndex) ? "-> %s\n" : "   %s\n", apps[i].appPath);
     }
-
-    gsKit_sync_flip(gsGlobal);
 }
 
 void executeELF(const char* path) {
-    printf("\nLoading ELF: %s\n", path);
+    scr_printf("\nLoading ELF: %s\n", path);
     SifLoadFileInit();
 
     int ret = SifLoadElf(path, NULL);
     if (ret < 0) {
-        printf("Failed to load ELF: %d\n", ret);
+        scr_printf("Failed to load ELF: %d\n", ret);
         SifLoadFileExit();
         return;
     }
 
-    printf("Execution passed to the ELF.\n");
+    scr_printf("Execution passed to the ELF.\n");
     SleepThread();
 }
 
-int main(int argc, char* argv[]) {
-    GSGLOBAL* gsGlobal = gsKit_init_global();
-    if (gsGlobal == NULL) {
-        printf("Error initializing GSKit!\n");
-        return 1;
-    }
-
-    gsKit_mode_switch(gsGlobal, GS_MODE_NTSC);
-    GSFONTM font;
-    int ret = gsKit_fontm_upload(gsGlobal, &font);
-    if (ret != 0) {
-        printf("Error uploading font!\n");
-        return 1;
-    }
-
-    padInit(0);
-
-    printf("\nPS2 ELF Loader\n==============\n");
-
-    listELFs("mass:/");
-    listELFs("mc0:/");
-    listELFs("mc1:/");
-
-    if (elfCount == 0) {
-        printf("No ELF files found.\nPress any button to exit.\n");
-        while (1) {
-            struct padButtonStatus buttons;
-            if (padRead(0, 0, &buttons))
-                break;
-        }
-        return 0;
-    }
+void waitForExit() {
+    scr_printf("No ELF files found.\nPress any button to exit.\n");
 
     while (1) {
-        displayMenu(gsGlobal, &font);
+        struct padButtonStatus buttons;
+        if (padRead(0, 0, &buttons)) {
+            break;
+        }
+    }
+}
+
+int main(int argc, char* argv[]) {
+    sbv_patch_disable_prefix_check();
+    init_scr();
+    scr_clear();
+    sleep(1);
+    readAppsList("mc0:/APPS.LST");
+
+    scr_printf("\nPS2 ELF Loader\n==============\n");
+    while (1) {
+        SifInitRpc(0);
+        padInit(0);
+        displayMenu();
 
         struct padButtonStatus buttons;
         padRead(0, 0, &buttons);
 
-        unsigned int paddata = 0xffff ^ buttons.btns;
+        unsigned int paddata = 0xFFFF ^ buttons.btns;
 
         if (paddata & PAD_UP) {
-            selectedIndex--;
-            if (selectedIndex < 0)
-                selectedIndex = elfCount - 1;
+            selectedIndex = (selectedIndex - 1 + appCount) % appCount;
         }
         else if (paddata & PAD_DOWN) {
-            selectedIndex++;
-            if (selectedIndex >= elfCount)
-                selectedIndex = 0;
+            selectedIndex = (selectedIndex + 1) % appCount;
         }
         else if (paddata & PAD_CROSS) {
-            executeELF(elfPaths[selectedIndex]);
+            if (selectedIndex == 0) {
+
+                executeELF(ROM0_OSDSYS_PATH);
+            }
+            else {
+                executeELF(apps[selectedIndex].appPath);
+            }
+            break;
         }
 
         sleep(1);
     }
 
+    scr_printf("End of list");
     return 0;
 }
